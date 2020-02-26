@@ -53,41 +53,53 @@ def main():
         downloaded.raise_for_status()
 
         if downloaded.status_code == 200:
-            downloadLinks = []
-            if singleVideo(searchLink):
-                downloadLinks.append(searchLink)
-            else:
-                maxLinks = sys.argv[1] if len(sys.argv) > 1 else 5
-                soup = BeautifulSoup(downloaded.text, "html.parser")
-                links = soup.findAll("a", attrs={"aria-hidden": "true"})
-
-                for index, link in enumerate(links):
-                    downloadLink = f"https://www.youtube.com{link.get('href')}"
-                    downloadLinks.append(downloadLink)
-                    if index + 1 == maxLinks:
-                        break
+            downloadLinks = prepareDownloadLinks(downloaded, searchLink)
             if len(downloadLinks) != 0:
-                outdir = f"{Path.home()}/Downloads/yt/"
-                cwd = getcwd()
-                makedirs(outdir, exist_ok=True)
-                chdir(outdir)
-                ydl_opts = {}
-                if args.audio_only:
-                    ydl_opts = {
-                        "format": "bestaudio/best",
-                        "postprocessors": [
-                            {
-                                "key": "FFmpegExtractAudio",
-                                "preferredcodec": "mp3",
-                                "preferredquality": "192",
-                            }
-                        ],
-                    }
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    for i, downloadLink in enumerate(downloadLinks):
-                        print(f"downloading {i}/{len(downloadLinks)}")
-                        ydl.download([downloadLink])
-                chdir(cwd)
+                download(args, downloadLinks)
+
+
+def prepareDownloadLinks(downloaded, searchLink):
+    if singleVideo(searchLink):
+        return [searchLink]
+    else:
+        maxLinks = sys.argv[1] if len(sys.argv) > 1 else 5
+        soup = BeautifulSoup(downloaded.text, "html.parser")
+        links = soup.findAll("a", attrs={"aria-hidden": "true"})
+        downloadLinks = []
+        for index, link in enumerate(links):
+            downloadLink = f"https://www.youtube.com{link.get('href')}"
+            downloadLinks.append(downloadLink)
+            if index + 1 == maxLinks:
+                break
+        return downloadLinks
+
+
+def download(args, downloadLinks):
+    outdir = f"{Path.home()}/Downloads/yt/"
+    cwd = getcwd()
+    makedirs(outdir, exist_ok=True)
+    chdir(outdir)
+    ydl_opts = prepareOptions(args)
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        for i, downloadLink in enumerate(downloadLinks):
+            print(f"downloading {i}/{len(downloadLinks)}")
+            ydl.download([downloadLink])
+    chdir(cwd)
+
+
+def prepareOptions(args):
+    if args.audio_only:
+        return {
+            "format": "bestaudio/best",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+        }
+    return {}
 
 
 if __name__ == "__main__":
